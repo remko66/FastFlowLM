@@ -5,9 +5,7 @@ Includes:
 - Search-augmented structured JSON querying
 - Webpage downloading and summarization
 """
-
-from src.FastFlowLM import FastFlowServer
-
+from FastFlowLM import FastFlowServer
 
 def sample_basic_query(server: FastFlowServer) -> str:
     """Run a simple, direct plain text query without search."""

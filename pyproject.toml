@@ -1,7 +1,9 @@
 [project]
-name = "fastflow"
-version = "0.4.0"
+name = "fastflowml"
+version = "0.5.0"
+description="a wrapper around the awesome FastFlowLM project from AMD(c) requires flastflowlm to be installed"
 requires-python = ">=3.14"
+readme = "README.md"
 dependencies = [
     "beautifulsoup4",
     "ddgs",
@@ -11,3 +13,9 @@ dependencies = [
     "requests",
     "selenium",
 ]
+authors = [
+    { name = "Remko Weingarten", email = "remko66@gmail.com" }
+]
+
+[project.urls]
+Homepage = "https://github.com/remko66/FastFlowLM"

@@ -27,12 +27,9 @@ A Python orchestration client and wrapper for the **FastFlowLM (`flm`)** NPU-acc
 ## Installation
 
 ### Using pip
+pip install fastflowml
 
-Install the required dependencies using `requirements.txt`:
 
-```bash
-pip install -r requirements.txt
-```
 
 Or install dependencies manually:
 
@@ -61,7 +58,7 @@ uv sync
 ### 1. Basic Server Startup & Text Query
 
 ```python
-from src.FastFlowLM import FastFlowServer
+from FastFlowLM import FastFlowServer
 
 # Initialize server wrapper with target model
 ff = FastFlowServer(model="qwen3-it:4b", port=11435)
