@@ -1,0 +1,400 @@
+# FastFlowLM Documentation (`FastFlowLM.py`)
+
+## 1. Overview
+
+`FastFlowServer` (defined in `support/FastFlowLM.py`) is a Python wrapper and orchestration client for the **FastFlowLM (`flm`)** NPU-accelerated local inference engine (optimized for AMD Ryzen AI / Strix NPU). 
+
+It provides:
+- Automatic lifecycle management for the `flm serve` background process.
+- OpenAI-compatible chat, text, vision, and audio completions.
+- Tool-calling search augmentation (via DuckDuckGo and Playwright / Selenium web scraping).
+- Robust JSON extraction with self-healing model-based JSON syntax repair.
+- Conversation history tracking.
+
+---
+
+## 2. Dependencies & Prerequisites
+
+### System Requirements
+- `flm` CLI installed and available in `PATH`.
+- Docker (optional, required only when `use_selenium=True` to run the `selenium/standalone-chrome` container).
+
+### Python Packages
+- **Core:** `requests`, `openai`
+- **Search & Web Scraping:** `ddgs` (DuckDuckGo Search), `bs4` (BeautifulSoup4), `markdownify`
+- **Headless Browsers:** `playwright` (default) or `selenium`
+- WARNING: To use selenium Docker has to be installed
+---
+
+## 3. Initialization & Parameters
+
+### `FastFlowServer(...)`
+
+```python
+from support.FastFlowLM import FastFlowServer
+
+server = FastFlowServer(
+    model="qwen3-it:4b",
+    host="127.0.0.1",
+    port=11435,
+    context_window=65536,
+    max_result_tokens=8196,
+    use_selenium=False,
+    selenium=None
+)
+```
+
+### Constructor Parameters:
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `model` | `str` | `"qwen3-it:4b"` | Model tag/identifier to serve and query with `flm`. |
+| `host` | `str` | `"127.0.0.1"` | Host IP where `flm` server listens. |
+| `port` | `int` | `11435` | Port number for the `flm` server. |
+| `context_window` | `int` | `65536` | Context window size (`--ctx`) passed to `flm serve`. |
+| `max_result_tokens` | `int` | `8196` | Maximum result token limit. |
+| `use_selenium` | `bool` | `False` | Use Selenium (Docker container) instead of Playwright for scraping. |
+| `selenium` | `bool` or `None` | `None` | Alias for `use_selenium` (if provided, overrides `use_selenium`). |
+
+> **Note on Dependency Validation:** If `use_selenium=True` (or `selenium=True`) and `selenium` / `ClientConfig` is not installed, an `ImportError` is raised immediately upon initialization.
+
+---
+
+## 4. Method Reference
+
+### 4.1 Server Lifecycle & Model Management
+
+#### `start(downloadifmissing=True)`
+Starts the FastFlowLM server subprocess (`flm serve ...`). If `downloadifmissing=True`, it automatically pulls the model first using `pull_model`. If `use_selenium=True`, it also ensures the Selenium Docker container is running.
+- **Parameters:**
+  - `downloadifmissing` (*bool*): Whether to pull the model if missing before starting.
+- **Returns:** `None`
+
+#### `stop()`
+Gracefully terminates the `flm serve` subprocess and stops the Selenium Docker container if enabled.
+- **Returns:** `None`
+
+#### `check_fastflowlm()`
+Checks whether the FastFlowLM server is reachable on `host:port` via socket connection.
+- **Returns:** `bool` (`True` if online, `False` otherwise).
+
+#### `list_models()`
+Executes `flm list` and parses all available/downloaded models.
+- **Returns:** `list[dict]` (e.g. `[{"name": "qwen3-it:4b", "downloaded": True}]`) or `{"error": str}`.
+
+#### `pull_model(model)`
+Downloads the specified model via `flm pull <model>`.
+- **Parameters:**
+  - `model` (*str*): Model identifier.
+- **Returns:** `dict` (e.g. `{"error": ""}`).
+
+#### `remove_model(model)`
+Deletes the specified model via `flm remove <model>`.
+- **Parameters:**
+  - `model` (*str*): Model identifier.
+- **Returns:** `dict` (e.g. `{"error": ""}`).
+
+---
+
+### 4.2 Selenium Management
+
+#### `check_selenium()`
+Pings the Selenium grid status endpoint (`http://localhost:{selenium_port}/status`) to verify readiness.
+- **Returns:** `bool`
+
+#### `start_selenium()`
+Launches a standalone Chrome Selenium container (`selenium/standalone-chrome`) via Docker on port 4444.
+- **Returns:** `None`
+
+#### `stop_selenium()`
+Stops and removes the `selenium-cont` Docker container.
+- **Returns:** `None`
+
+---
+
+### 4.3 Search & Web Scraping
+
+#### `check_search_dependencies()`
+Validates that required libraries are imported before executing queries with `use_search=True`.
+- Validates: `bs4`, `ddgs`, and `playwright` (or `selenium`).
+- **Raises:** `ImportError` detailing which packages are missing.
+
+#### `search_duckduckgo(query, region="us-en", max_results=5)`
+Queries DuckDuckGo via `ddgs` and stores the search query/results on `self`.
+- **Parameters:**
+  - `query` (*str*): Search query.
+  - `region` (*str*): Region code (default: `"us-en"`).
+  - `max_results` (*int*): Max number of results.
+- **Returns:** `list[dict]` search results.
+
+#### `download_url(url)`
+Downloads web page content. Uses Playwright (or requests fallback) when `use_selenium=False`, or delegates to `download_url_selenium(url)` when `use_selenium=True`.
+- **Parameters:**
+  - `url` (*str*): URL to download.
+- **Returns:** `dict` with keys `{"full_html", "body_html", "text", "markdown"}`.
+
+#### `download_url_selenium(url)`
+Fetches page source via remote Selenium WebDriver on port 4444 and parses body text / markdown.
+- **Parameters:**
+  - `url` (*str*): URL to download.
+- **Returns:** `dict` with keys `{"full_html", "body_html", "text", "markdown"}`.
+
+---
+
+### 4.4 Conversation & State Management
+
+#### `escape_custom_chars(text)`
+Escapes double quotes (`"`), opening square brackets (`[`), and opening curly braces (`{`).
+- **Parameters:**
+  - `text` (*str*): Input string.
+- **Returns:** `str`
+
+#### `addconvo_system(txt)`
+Appends a system message to `self.convo`.
+
+#### `addconvo_user(txt)`
+Appends a user message to `self.convo`.
+
+#### `addconvo_assistant(txt)`
+Appends an assistant message to `self.convo`.
+
+---
+
+### 4.5 Inference & Querying
+
+#### `query_plain(prompt, desperate=0, timeout=180, use_search=True, max_search_results=10, is_json=False, json_sample=None)`
+High-level single prompt execution. Automatically checks server status, attaches search tool prompts if requested, and formats/repairs JSON outputs.
+- **Parameters:**
+  - `prompt` (*str*): User prompt.
+  - `desperate` (*int*): Temperature profile (`0`: temp 0 / top_p 0.1, `1`: temp 0.2 / top_p 0.9, `2`: temp 0.7 / top_p 0.9).
+  - `timeout` (*int*): Timeout in seconds.
+  - `use_search` (*bool*): Enable DuckDuckGo search + web scraping tool calls.
+  - `max_search_results` (*int*): Search result count limit.
+  - `is_json` (*bool*): Enforce JSON output.
+  - `json_sample` (*dict* or *str*, optional): Target JSON schema/sample structure for guided formatting.
+- **Returns:** `dict` (if `is_json=True` and parsed successfully) or `str` (raw text response).
+
+#### `query_chat(messages=None, is_json=False, time_out=900, use_search=True, desperate=0, max_search_results=5)`
+Multi-turn or custom message list chat completions via OpenAI-compatible endpoint. Executes tool loops for search & webpage downloads.
+- **Parameters:**
+  - `messages` (*list[dict]*, optional): List of message dictionaries (`role`, `content`). Defaults to `self.convo`.
+  - `is_json` (*bool*): Parse JSON output.
+  - `time_out` (*int*): Request timeout.
+  - `use_search` (*bool*): Enable automatic tool execution for internet searching.
+  - `desperate` (*int*): Temperature configuration level (0, 1, or 2).
+  - `max_search_results` (*int*): Search results count per query.
+- **Returns:** `tuple[str, dict | None]` containing `(raw_text_response, parsed_json_or_none)`.
+
+#### `extract_response_json(text, try_fix=True)`
+Extracts JSON from Markdown code blocks (````json ... ````) or raw text. If invalid, attempts rule-based sanitization and multi-attempt LLM-assisted JSON repair.
+- **Parameters:**
+  - `text` (*str*): Raw LLM response string.
+  - `try_fix` (*bool*): Whether to invoke the LLM to fix malformed JSON on failure.
+- **Returns:** `dict` or `None`.
+
+---
+
+### 4.6 Multimodal: Vision & Audio
+
+#### `query_vision(prompt, image_path=None, image_url=None, timeout=120)`
+Performs visual question answering with a single image (local file path or remote URL).
+- **Parameters:**
+  - `prompt` (*str*): Prompt describing what to analyze.
+  - `image_path` (*str*, optional): Local image file path (automatically base64-encoded).
+  - `image_url` (*str*, optional): Direct image URL or data URI.
+  - `timeout` (*int*): Request timeout in seconds.
+- **Returns:** `tuple[response_object, content_string]`
+
+#### `query_vision_multiple(prompt, image_paths=None, image_urls=None, timeout=120)`
+Performs visual question answering with multiple images.
+- **Parameters:**
+  - `prompt` (*str*): Prompt describing what to analyze.
+  - `image_paths` (*list[str]*, optional): List of local image paths.
+  - `image_urls` (*list[str]*, optional): List of image URLs.
+  - `timeout` (*int*): Request timeout in seconds.
+- **Returns:** `tuple[response_object, content_string]`
+
+#### `audio(prompt, audio_path="../input-audio/list-01.wav")`
+Sends an audio file along with a prompt to multimodal models (e.g., `gemma4-it:e4b`).
+- **Parameters:**
+  - `prompt` (*str*): Text instructions.
+  - `audio_path` (*str*): Path to WAV/audio file.
+- **Returns:** `str` (assistant response content).
+
+---
+
+## 5. Usage Samples
+
+### 5.1 Basic Server Startup & Plain Query
+
+```python
+from support.FastFlowLM import FastFlowServer
+
+ff = FastFlowServer(model="qwen3-it:4b", port=11435)
+
+try:
+    # Start server (pulls model if missing)
+    ff.start()
+
+    # Simple plain query without web search
+    response = ff.query_plain("Explain quantum computing in 2 sentences.", use_search=False)
+    print("Response:", response)
+
+finally:
+    ff.stop()
+```
+
+---
+
+### 5.2 Search-Augmented Querying & Web Scraping
+
+```python
+from support.FastFlowLM import FastFlowServer
+
+ff = FastFlowServer(model="qwen3.5:9b", use_selenium=False)
+
+try:
+    ff.start()
+
+    # Query with live DuckDuckGo search and Playwright scraping
+    query = "What were the major tech news headlines today?"
+    answer = ff.query_plain(query, use_search=True, max_search_results=5)
+    print("Answer with live search:", answer)
+
+    # Directly download and convert a webpage to Markdown
+    page = ff.download_url("https://news.ycombinator.com")
+    print("Extracted Text Preview:", page["text"][:300])
+    print("Markdown Preview:", page["markdown"][:300])
+
+finally:
+    ff.stop()
+```
+
+---
+
+### 5.3 Structured JSON Query with Sample Schema
+
+```python
+from support.FastFlowLM import FastFlowServer
+
+ff = FastFlowServer(model="qwen3-it:4b")
+
+try:
+    ff.start()
+
+    schema = {
+        "city": "Amsterdam",
+        "temperature_celsius": 18,
+        "condition": "Partly Cloudy",
+        "highlights": ["rain possible in afternoon"]
+    }
+
+    result = ff.query_plain(
+        "Give me the current weather report for Paris",
+        is_json=True,
+        json_sample=schema,
+        use_search=True
+    )
+
+    print("Parsed JSON Result:", result)
+    print("City:", result.get("city"))
+
+finally:
+    ff.stop()
+```
+
+---
+
+### 5.4 Multi-Turn Conversation Chat
+
+```python
+from support.FastFlowLM import FastFlowServer
+
+ff = FastFlowServer(model="qwen3-it:4b")
+
+try:
+    ff.start()
+
+    ff.addconvo_system("You are a helpful coding assistant specialized in Python.")
+    ff.addconvo_user("How do I reverse a list in Python?")
+    
+    raw_text, _ = ff.query_chat(use_search=False)
+    print("Assistant:", raw_text)
+    ff.addconvo_assistant(raw_text)
+
+    ff.addconvo_user("What is the time complexity of that?")
+    raw_text2, _ = ff.query_chat(use_search=False)
+    print("Assistant:", raw_text2)
+
+finally:
+    ff.stop()
+```
+
+---
+
+### 5.5 Vision Query (Single & Multiple Images)
+
+```python
+from support.FastFlowLM import FastFlowServer
+
+ff = FastFlowServer(model="qwen3.5:9b")
+
+try:
+    ff.start()
+
+    # Single local image query
+    _, description = ff.query_vision(
+        prompt="Describe what you see in this chart.",
+        image_path="output_images/chart.png"
+    )
+    print("Chart Description:", description)
+
+    # Multiple images comparison
+    _, comparison = ff.query_vision_multiple(
+        prompt="Compare these two images and list the differences.",
+        image_paths=["output_images/before.png", "output_images/after.png"]
+    )
+    print("Comparison:", comparison)
+
+finally:
+    ff.stop()
+```
+
+---
+
+### 5.6 Audio Query
+
+```python
+from support.FastFlowLM import FastFlowServer
+
+ff = FastFlowServer()
+
+try:
+    ff.start()
+    transcript = ff.audio(
+        prompt="Transcribe and summarize this audio recording.",
+        audio_path="input-audio/sample.wav"
+    )
+    print("Audio Transcript / Summary:", transcript)
+finally:
+    ff.stop()
+```
+
+---
+
+### 5.7 Model Lifecycle Management
+
+```python
+from support.FastFlowLM import FastFlowServer
+
+ff = FastFlowServer()
+
+# List downloaded and available models
+models = ff.list_models()
+print("Available Models:", models)
+
+# Pull a new model
+ff.pull_model("qwen3-it:4b")
+
+# Remove a model
+# ff.remove_model("old-model:tag")
+```

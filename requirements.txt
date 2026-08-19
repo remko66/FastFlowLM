@@ -1,0 +1,7 @@
+requests
+markdownify
+openai
+ddgs
+playwright
+beautifulsoup4
+selenium
