@@ -61,7 +61,7 @@ uv sync
 ### 1. Basic Server Startup & Text Query
 
 ```python
-from FastFlowLM import FastFlowServer
+from src.FastFlowLM import FastFlowServer
 
 # Initialize server wrapper with target model
 ff = FastFlowServer(model="qwen3-it:4b", port=11435)
@@ -84,7 +84,7 @@ finally:
 ### 2. Search-Augmented Querying (Live DuckDuckGo Search)
 
 ```python
-from FastFlowLM import FastFlowServer
+from src.FastFlowLM import FastFlowServer
 
 ff = FastFlowServer(model="qwen3.5:9b")
 
@@ -110,7 +110,7 @@ finally:
 `FastFlowServer` can enforce structured JSON output and automatically repair invalid syntax.
 
 ```python
-from FastFlowLM import FastFlowServer
+from src.FastFlowLM import FastFlowServer
 
 ff = FastFlowServer(model="qwen3-it:4b")
 
@@ -143,7 +143,7 @@ finally:
 ### 4. Multi-Turn Conversation Chat
 
 ```python
-from FastFlowLM import FastFlowServer
+from src.FastFlowLM import FastFlowServer
 
 ff = FastFlowServer(model="qwen3-it:4b")
 
@@ -153,7 +153,7 @@ try:
     # Build conversation context
     ff.addconvo_system("You are a helpful coding assistant specialized in Python.")
     ff.addconvo_user("How do I reverse a list in Python?")
-    
+
     reply, _ = ff.query_chat(use_search=False)
     print("Assistant:", reply)
     ff.addconvo_assistant(reply)
@@ -174,7 +174,7 @@ finally:
 #### Vision Analysis (Single or Multiple Images)
 
 ```python
-from FastFlowLM import FastFlowServer
+from src.FastFlowLM import FastFlowServer
 
 ff = FastFlowServer(model="qwen3.5:9b")
 
@@ -202,7 +202,7 @@ finally:
 #### Audio Analysis
 
 ```python
-from FastFlowLM import FastFlowServer
+from src.FastFlowLM import FastFlowServer
 
 ff = FastFlowServer(model="gemma4-it:e4b")
 
@@ -222,7 +222,7 @@ finally:
 ### 6. Model Management
 
 ```python
-from FastFlowLM import FastFlowServer
+from src.FastFlowLM import FastFlowServer
 
 ff = FastFlowServer()
 
